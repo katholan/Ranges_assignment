@@ -1,0 +1,132 @@
+---
+title: "holan_ranges_assignment"
+output: html_document
+---
+Part I
+
+Loading packages.
+```{r}
+source("http://bioconductor.org/biocLite.R")
+biocLite()
+biocLite("GenomicRanges")
+
+library(IRanges)
+library(GenomicRanges)
+library(BiocInstaller)
+biocLite("GenomicFeatures")
+biocLite("TxDb.Mmusculus.UCSC.mm10.ensGene")
+library(TxDb.Mmusculus.UCSC.mm10.ensGene)
+biocLite("rtracklayer")
+library(rtracklayer)
+
+```
+
+Import Mus musculus chr1 file
+Make sure you have the file from the bds repository in your working directory
+```{r}
+dbsnp137 <- import("mm10_snp137_chr1_trunc.bed.gz")
+```
+
+Create variable of the annotated mouse genome
+```{r}
+txdb <- TxDb.Mmusculus.UCSC.mm10.ensGene
+```
+
+Collapse the overlapping exons in this file
+create variable that only includes exons from chr1
+```{r}
+collapsed_exons <- reduce(exons(txdb), ignore.strand=TRUE)
+chr1_collapsed_exons <- collapsed_exons[seqnames(collapsed_exons) == "chr1"]
+```
+
+Summary will show you the quartiles, min, mean for the widths of the variants in the snp file
+```{r}
+summary(width(dbsnp137))
+```
+
+Adjust the variants of width 0 so that we can find where they overlap with the exon ranges in the txdb file
+First create a new variable with the snp file so that the original isn't overwritten
+```{r}
+dbsnp137_resized <- dbsnp137
+```
+
+Create a variable of all variants with widths equal to 0
+change those variants to have a width of 1
+```{r}
+zw_i <- width(dbsnp137_resized) == 0
+dbsnp137_resized[zw_i] <- resize(dbsnp137_resized[zw_i], width=1)
+```
+
+Create new variable that consists of the variants that overlap the chr1 exons
+```{r}
+hits <- findOverlaps(dbsnp137_resized, chr1_collapsed_exons, 
+        ignore.strand=TRUE)
+```
+
+and determine the number of variants and the proportion of variants that are exonic:
+Find the number of unique variants that cover an exon and the overall proportion of variants that are exonic
+```{r}
+number_of_variants <- length(unique(queryHits(hits)))
+proportion_of_variants <- length(unique(queryHits(hits)))/length(dbsnp137_resized)
+number_of_variants
+proportion_of_variants
+```
+
+Find the number of variants per exon 
+```{r}
+var_counts <- countOverlaps(chr1_collapsed_exons, dbsnp137_resized, ignore.strand=TRUE)
+var_counts
+```
+
+Add the variant counts to a new column in your chr1 exon file
+You should now be able to see the number of varients in the snp file that overlap with each exon range
+```{r}
+chr1_collapsed_exons$num_vars <- var_counts
+head(chr1_collapsed_exons)
+```
+
+Part II
+
+Write a file to your working directory that contains the exon ranges and the number of variants per exon
+```{r}
+export(chr1_collapsed_exons, format = "gff3", "chr1_collapsed_exons")
+```
+
+Extra
+
+Import annotation file for Mus musculus
+```{r}
+mm_gtf <- import('Mus_musculus.GRCm38.75_chr1.gtf.gz')
+```
+
+Create new variable that only include protein coding genes from this file
+```{r}
+chr1_pcg <- mm_gtf[mm_gtf$type == "gene" & 
+                     mm_gtf$gene_biotype == "protein_coding"]
+```
+
+Inspect your new variable to look at the summary statistics for the widths of your protein coding regions as well as the total number of regions you are looking at
+```{r}
+summary(width(chr1_pcg))
+length(chr1_pcg)
+```
+
+The function flank() will let us pull the (in this case) 3000 base pairs upstream of our regions, which will allow us to pull the promoter regions of our protein coding genes
+```{r}
+chr1_pcg_3kb_up <- flank(chr1_pcg, width=3000)
+```
+
+Alternatively, you can use the function promoters(), which will pull the designated number of base pairs upstream from your range
+```{r}
+chr1_pcg_3kb_up2 <- promoters(chr1_pcg, upstream=3000, downstream=0)
+```
+
+Install packages in order to pull the promoter sequences from the Mus musculus genome.  Note this method will only work if your organism has a Bioconductor genome package
+```{r}
+biocLite("BSgenome")
+biocLite("BSgenome.Mmusculus.UCSC.mm10")
+library(BSgenome.Mmusculus.UCSC.mm10)
+```
+
+
+
