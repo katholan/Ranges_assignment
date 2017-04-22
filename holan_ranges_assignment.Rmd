@@ -128,5 +128,36 @@ biocLite("BSgenome.Mmusculus.UCSC.mm10")
 library(BSgenome.Mmusculus.UCSC.mm10)
 ```
 
+assign the Mus musculus genome to a variable
+```{r}
+mm_gm <- BSgenome.Mmusculus.UCSC.mm10
+```
 
+Since there isn't a universal convention for naming chromosomes, they are often called different things by differnt groups.  This code checks to see if the chromosome names in our ranges object are the same as those in the m. musculus reference genome.
+```{r}
+all(seqlevels(chr1_pcg_3kb_up) %in% seqlevels(mm_gm))
+```
+
+Check the seq levels style for the ranges object and the genome object
+```{r}
+seqlevelsStyle(mm_gm)
+seqlevelsStyle(chr1_pcg_3kb_up)
+```
+
+Change the seq levels style of the ranges object to UCSC to match the reference genome.  Check to make sure they match. 
+```{r}
+seqlevelsStyle(chr1_pcg_3kb_up) <- "UCSC"
+all(seqlevels(chr1_pcg_3kb_up) %in% seqlevels(mm_gm))
+```
+
+Get the sequences for the our ranges from the reference genome
+```{r}
+chr1_3kb_seqs <- getSeq(mm_gm, chr1_pcg_3kb_up)
+```
+
+Wrtie a fasta file that contains the promoter region sequences for our protein coding genes
+```{r}
+writeXStringSet(chr1_3kb_seqs, file="mm10_chr1_3kb_promoters.fasta",
+  format="fasta")
+```
 
